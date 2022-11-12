@@ -2,9 +2,8 @@
   <div class="app">
     <h2 class="app__title">Список нужных вещей</h2>
     <div class="app__content">
-      <Spinner v-if="fetching"> Загрузка</Spinner>
 
-      <table v-else width="100%" class="app__list">
+      <table width="100%" class="app__list">
         <TableMenu @dialogVisible="this.dialogVisible = true" @setSort="setSort" :sort="sort"></TableMenu>
         <TableItem v-if="filteredList.length > 0" v-for="el in filteredList" @saveChanges="saveChanges" :key="el.uid"
           :item="el" />
@@ -12,9 +11,6 @@
 
       </table>
 
-      <paginate v-model="currentPage" :page-count="maxPages" :page-range="3" :prev-text="'Prev'" :next-text="'Next'"
-        :container-class="'pagination'" :page-class="'page-item'" :click-handler="loadItems">
-      </paginate>
       <Dialog v-model:show="dialogVisible">
         <div class="filter">
           <h2>Фильтрация данных</h2>
@@ -61,7 +57,7 @@ export default {
   },
   data() {
     return {
-      currentPage: 1,
+      currentPage: 0,
       fetching: false,
       stopFetching: false,
       maxPages: 100,
@@ -79,12 +75,16 @@ export default {
         serialnumber: "",
         macaddres: "",
       },
-
     }
   },
   methods: {
     showDialog() {
       this.dialogVisible = true
+    },
+    scrollHandler(e) {
+      if (e.target.documentElement.scrollHeight - (e.target.documentElement.scrollTop + window.innerHeight) < 100) {
+        this.loadItems()
+      }
     },
     setSort(name, ascending) {
       this.sort.name = name
@@ -95,21 +95,26 @@ export default {
         return i.uid === inputs.uid ? inputs : i
       })
     },
-    async loadItems(page) {
+    async loadItems() {
 
       if (this.fetching || this.stopFetching) return
       this.fetching = true
-      this.currentPage = page
-
+      this.currentPage += 1
       const { data } = await axios.get(`http://localhost:3000/testList?_page=${this.currentPage}&_limit=${this.elementsOnPage}`)
-      this.list = data
+      if (data.length < 30 || this.currentPage === this.maxPages) {
+        this.stopFetching = true
+      }
+      this.list = [...this.list, ...data]
       this.fetching = false
     }
   },
   mounted() {
     this.loadItems()
+    document.addEventListener('scroll', this.scrollHandler)
   },
-
+  unmounted() {
+    document.removeEventListener('scroll', this.scrollHandler)
+  },
   computed: {
     filteredList() {
       let tempList = this.list
